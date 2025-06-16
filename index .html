@@ -1,0 +1,279 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>История во тьме — групповой чат</title>
+  <style>
+    html, body {
+      margin: 0; padding: 0; height: 100%;
+      background: #222; color: #eee;
+      font-family: Arial, sans-serif;
+      -webkit-text-size-adjust: 100%;
+      -webkit-overflow-scrolling: touch;
+    }
+    body {
+      display: flex; flex-direction: column; height: 100vh;
+      justify-content: center;
+      align-items: center;
+    }
+    #login, #heroSetup, #chat {
+      width: 100%;
+      max-width: 400px;
+      padding: 10px;
+      box-sizing: border-box;
+      background: #333;
+      border-radius: 8px;
+      display: none;
+      flex-direction: column;
+    }
+    #login {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+    }
+    #chat {
+      height: 100vh;
+      max-height: 100vh;
+      display: flex;
+      flex-direction: column;
+      background: #111;
+    }
+    #messages {
+      flex-grow: 1;
+      background: #111;
+      padding: 10px;
+      border-radius: 6px;
+      overflow-y: auto;
+      margin-bottom: 10px;
+      font-size: 16px;
+      color: #eee;
+    }
+    .msg {
+      background: #333;
+      padding: 8px;
+      margin: 5px 0;
+      border-radius: 5px;
+      word-break: break-word;
+      display: flex;
+      align-items: center;
+    }
+    .msg img {
+      width: 30px;
+      height: 30px;
+      border-radius: 50%;
+      margin-right: 8px;
+      object-fit: cover;
+    }
+    input, button, select {
+      width: 100%;
+      margin: 5px 0;
+      padding: 8px;
+      font-size: 16px;
+      box-sizing: border-box;
+      border-radius: 4px;
+      border: none;
+      background: #555;
+      color: #eee;
+    }
+    input::placeholder {
+      color: #ccc;
+    }
+    button:hover {
+      background: #777;
+      cursor: pointer;
+    }
+    #error { color: #f55; margin-top: 5px; min-height: 20px; }
+    label {
+      font-size: 14px;
+      margin-top: 8px;
+    }
+  </style>
+</head>
+<body>
+
+<div id="login">
+  <h2>Вход</h2>
+  <input type="password" id="password" placeholder="Введите пароль" autocomplete="off" />
+  <button id="loginBtn">Войти</button>
+  <div id="error"></div>
+</div>
+
+<div id="heroSetup">
+  <h3>Настройка героя</h3>
+  <input id="heroName" placeholder="Ваше имя" autocomplete="off" />
+  <label for="heroAvatarFile">Загрузить аватарку (фото)</label>
+  <input type="file" id="heroAvatarFile" accept="image/*" />
+  <button id="saveHero">Сохранить</button>
+</div>
+
+<div id="chat">
+  <h2>История во тьме — групповой чат</h2>
+
+  <label for="character">Выберите роль:</label>
+  <select id="character">
+    <option>Мама</option>
+    <option>Подруга Моли</option>
+    <option>...</option>
+    <option>...</option>
+    <option>Автор</option>
+  </select>
+
+  <label for="background">Выберите фон:</label>
+  <select id="background">
+    <option value="#222">Тёмный фон</option>
+    <option value="#330000">Кровавый фон</option>
+    <option value="#001022">Ночной фон</option>
+  </select>
+
+  <div id="messages"></div>
+  <input id="messageInput" placeholder="Введите сообщение" autocomplete="off" />
+  <button id="sendBtn">Отправить</button>
+</div>
+
+<script>
+  const loginDiv = document.getElementById('login');
+  const heroSetupDiv = document.getElementById('heroSetup');
+  const chatDiv = document.getElementById('chat');
+  const errorDiv = document.getElementById('error');
+  const passwordInput = document.getElementById('password');
+  const loginBtn = document.getElementById('loginBtn');
+
+  const heroNameInput = document.getElementById('heroName');
+  const heroAvatarFileInput = document.getElementById('heroAvatarFile');
+  const saveHeroBtn = document.getElementById('saveHero');
+
+  const characterSelect = document.getElementById('character');
+  const backgroundSelect = document.getElementById('background');
+  const messagesDiv = document.getElementById('messages');
+  const messageInput = document.getElementById('messageInput');
+  const sendBtn = document.getElementById('sendBtn');
+
+  let role = null; // 'actor' или 'hero'
+  let heroData = null; // {name, avatarDataUrl}
+  let actorAvatarDataUrl = null;
+
+  loginDiv.style.display = 'flex';
+  heroSetupDiv.style.display = 'none';
+  chatDiv.style.display = 'none';
+
+  loginBtn.onclick = () => {
+    const pass = passwordInput.value.trim();
+    errorDiv.textContent = '';
+    if(pass === 'actorpass') {
+      role = 'actor';
+      loginDiv.style.display = 'none';
+      chatDiv.style.display = 'flex';
+      backgroundSelect.disabled = false;
+      addMessage('Система', 'Вы вошли как актёр');
+      showActorAvatarUpload();
+    } else if(pass === 'heropass') {
+      role = 'hero';
+      loginDiv.style.display = 'none';
+      heroSetupDiv.style.display = 'flex';
+      backgroundSelect.disabled = true;
+    } else {
+      errorDiv.textContent = 'Неверный пароль';
+    }
+  };
+
+  saveHeroBtn.onclick = () => {
+    const name = heroNameInput.value.trim();
+    const file = heroAvatarFileInput.files[0];
+    if(!name) {
+      alert('Введите имя');
+      return;
+    }
+    if(!file) {
+      alert('Загрузите аватарку');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = function(e) {
+      heroData = {name, avatarDataUrl: e.target.result};
+      heroSetupDiv.style.display = 'none';
+      chatDiv.style.display = 'flex';
+      addMessage('Система', `Герой ${name} готов к истории`);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  function showActorAvatarUpload() {
+    if(document.getElementById('actorAvatarUpload')) return;
+
+    const label = document.createElement('label');
+    label.textContent = 'Загрузить аватарку актёра:';
+    label.setAttribute('for', 'actorAvatarFile');
+
+    const inputFile = document.createElement('input');
+    inputFile.type = 'file';
+    inputFile.id = 'actorAvatarFile';
+    inputFile.accept = 'image/*';
+
+    inputFile.onchange = () => {
+      const file = inputFile.files[0];
+      if(file) {
+        const reader = new FileReader();
+        reader.onload = function(e) {
+          actorAvatarDataUrl = e.target.result;
+          addMessage('Система', 'Аватарка актёра обновлена');
+        };
+        reader.readAsDataURL(file);
+      }
+    };
+
+    const container = document.createElement('div');
+    container.id = 'actorAvatarUpload';
+    container.style.margin = '10px 0';
+    container.appendChild(label);
+    container.appendChild(inputFile);
+
+    chatDiv.insertBefore(container, chatDiv.firstChild.nextSibling.nextSibling);
+  }
+
+  sendBtn.onclick = () => {
+    const text = messageInput.value.trim();
+    if(!text) return;
+    let senderName = '';
+    let avatarUrl = null;
+
+    const chosenCharacter = characterSelect.value;
+
+    if(role === 'actor') {
+      senderName = chosenCharacter;
+      avatarUrl = actorAvatarDataUrl;
+    } else if(role === 'hero') {
+      senderName = heroData ? heroData.name : 'Герой';
+      avatarUrl = heroData ? heroData.avatarDataUrl : null;
+    }
+
+    addMessage(senderName, text, avatarUrl);
+    messageInput.value = '';
+  };
+
+  backgroundSelect.onchange = () => {
+    document.body.style.backgroundColor = backgroundSelect.value;
+  };
+
+  function addMessage(sender, text, avatarUrl) {
+    const div = document.createElement('div');
+    div.className = 'msg';
+    if(avatarUrl) {
+      const img = document.createElement('img');
+      img.src = avatarUrl;
+      div.appendChild(img);
+    }
+    const span = document.createElement('span');
+    span.textContent = `${sender}: ${text}`;
+    div.appendChild(span);
+    messagesDiv.appendChild(div);
+    messagesDiv.scrollTop = messagesDiv.scrollHeight;
+  }
+
+  passwordInput.addEventListener('keydown', (e) => {
+    if(e.key === 'Enter') loginBtn.click();
+  });
+</script>
+
+</body>
+</html>
